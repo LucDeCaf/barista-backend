@@ -5,17 +5,13 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/LucDeCaf/go-simple-blog/author"
+	"github.com/LucDeCaf/go-simple-blog/models/author"
 )
 
 func main() {
 	http.HandleFunc("/author", func(w http.ResponseWriter, r *http.Request) {
 		// Create new author instance
-		a := author.Author{
-			Id:        1,
-			Firstname: "hello",
-			Lastname:  "world",
-		}
+		a := author.NewAuthor(1, "hello", "world")
 
 		// Create JSON encoder and write response
 		wr := json.NewEncoder(w)
