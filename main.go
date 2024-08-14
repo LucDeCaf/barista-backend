@@ -3,30 +3,113 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"flag"
 	"log"
 	"net/http"
 
-	"github.com/LucDeCaf/go-simple-blog/models/author"
 	_ "github.com/mattn/go-sqlite3"
+
+	mw "github.com/LucDeCaf/go-simple-blog/middleware"
+	"github.com/LucDeCaf/go-simple-blog/models/author"
+	"github.com/LucDeCaf/go-simple-blog/models/blog"
 )
 
-func main() {
-	db, err := sql.Open("sqliet3", "./db.db")
+var db *sql.DB
+
+func init() {
+	var err error
+
+	db, err = sql.Open("sqlite3", "./db.db")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to open db:", err)
 	}
-	defer db.Close()
+}
 
-	http.HandleFunc("/author", func(w http.ResponseWriter, r *http.Request) {
-		// Create new author instance
-		a := author.NewAuthor(1, "hello", "world")
+func main() {
+	portPtr := flag.String(
+		"port",
+		"8080",
+		"the port the application will run on",
+	)
 
-		// Create JSON encoder and write response
-		wr := json.NewEncoder(w)
-		if err := wr.Encode(a); err != nil {
-			log.Println(err)
+	flag.Parse()
+
+	port := *portPtr
+
+	http.Handle("/author", mw.Build(mw.ErrorLogger(authorHandler)))
+	http.Handle("/blog", mw.Build(mw.ErrorLogger(blogHandler)))
+
+	log.Println("api listening on port " + port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		log.Print(err)
+	}
+}
+
+func authorHandler(w http.ResponseWriter, r *http.Request) error {
+	authorTable := author.NewAuthorTable(db)
+
+	switch r.Method {
+	case http.MethodGet:
+		authors, err := authorTable.GetAll()
+		if err != nil {
+			return err
 		}
-	})
 
-	log.Fatal(http.ListenAndServe(":http", nil))
+		en := json.NewEncoder(w)
+		if err := en.Encode(authors); err != nil {
+			return err
+		}
+
+	case http.MethodPost:
+		de := json.NewDecoder(r.Body)
+		de.DisallowUnknownFields()
+
+		var a author.Author
+
+		if err := de.Decode(&a); err != nil {
+			return err
+		}
+
+		// Echo back request body
+		en := json.NewEncoder(w)
+		if err := en.Encode(a); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func blogHandler(w http.ResponseWriter, r *http.Request) error {
+	blogTable := blog.NewBlogTable(db)
+
+	switch r.Method {
+	case http.MethodGet:
+		blogs, err := blogTable.GetAll()
+		if err != nil {
+			return err
+		}
+
+		en := json.NewEncoder(w)
+		if err := en.Encode(blogs); err != nil {
+			return err
+		}
+	case http.MethodPost:
+		de := json.NewDecoder(r.Body)
+		de.DisallowUnknownFields()
+
+		var a author.Author
+
+		if err := de.Decode(&a); err != nil {
+			return err
+		}
+
+		// Echo back request body
+		en := json.NewEncoder(w)
+		if err := en.Encode(a); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
