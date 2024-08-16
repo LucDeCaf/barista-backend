@@ -19,7 +19,7 @@ import (
 
 var db *sql.DB
 
-type LoginRequest struct {
+type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
@@ -147,7 +147,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("invalid method %v", r.Method)
 	}
 
-	var lr LoginRequest
+	var lr loginRequest
 
 	de := json.NewDecoder(r.Body)
 	if err := de.Decode(&lr); err != nil {
