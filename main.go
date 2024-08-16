@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/LucDeCaf/go-simple-blog/auth"
 	mw "github.com/LucDeCaf/go-simple-blog/middleware"
 	"github.com/LucDeCaf/go-simple-blog/models/author"
 	"github.com/LucDeCaf/go-simple-blog/models/blog"
@@ -20,7 +21,7 @@ var db *sql.DB
 
 type LoginRequest struct {
 	Username string `json:"username"`
-	Uassword string `json:"password"`
+	Password string `json:"password"`
 }
 
 func init() {
@@ -54,7 +55,12 @@ func main() {
 }
 
 func middlewares(h mw.Handler) http.Handler {
-	return mw.Build(mw.GenericErrorWriter(mw.ErrorLogger(h)))
+	return mw.Build(mw.RequestLogger(mw.ErrorLogger(h)))
+}
+
+func httpRespond(w http.ResponseWriter, code int, message string) {
+	w.WriteHeader(code)
+	w.Write([]byte(fmt.Sprintf("%v %v\n", code, message)))
 }
 
 func authorHandler(w http.ResponseWriter, r *http.Request) error {
@@ -64,11 +70,13 @@ func authorHandler(w http.ResponseWriter, r *http.Request) error {
 	case http.MethodGet:
 		authors, err := authorTable.GetAll()
 		if err != nil {
+			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 		en := json.NewEncoder(w)
 		if err := en.Encode(authors); err != nil {
+			httpRespond(w, 500, "internal server error")
 			return err
 		}
 	case http.MethodPost:
@@ -78,14 +86,17 @@ func authorHandler(w http.ResponseWriter, r *http.Request) error {
 		var a author.Author
 
 		if err := de.Decode(&a); err != nil {
+			httpRespond(w, 400, "bad request")
 			return err
 		}
 
-		// Echo back request body
 		en := json.NewEncoder(w)
 		if err := en.Encode(a); err != nil {
+			httpRespond(w, 500, "internal server error")
 			return err
 		}
+	default:
+		httpRespond(w, 405, "method not allowed")
 	}
 
 	return nil
@@ -98,11 +109,13 @@ func blogHandler(w http.ResponseWriter, r *http.Request) error {
 	case http.MethodGet:
 		blogs, err := blogTable.GetAll()
 		if err != nil {
+			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 		en := json.NewEncoder(w)
 		if err := en.Encode(blogs); err != nil {
+			httpRespond(w, 500, "internal server error")
 			return err
 		}
 	case http.MethodPost:
@@ -112,14 +125,17 @@ func blogHandler(w http.ResponseWriter, r *http.Request) error {
 		var a author.Author
 
 		if err := de.Decode(&a); err != nil {
+			httpRespond(w, 400, "bad request")
 			return err
 		}
 
-		// Echo back request body
 		en := json.NewEncoder(w)
 		if err := en.Encode(a); err != nil {
+			httpRespond(w, 500, "internal server error")
 			return err
 		}
+	default:
+		httpRespond(w, 405, "method not allowed")
 	}
 
 	return nil
@@ -127,6 +143,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) error {
 
 func loginHandler(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
+		httpRespond(w, 405, "method not allowed")
 		return fmt.Errorf("invalid method %v", r.Method)
 	}
 
@@ -134,6 +151,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) error {
 
 	de := json.NewDecoder(r.Body)
 	if err := de.Decode(&lr); err != nil {
+		httpRespond(w, 400, "bad request")
 		return err
 	}
 
@@ -141,13 +159,22 @@ func loginHandler(w http.ResponseWriter, r *http.Request) error {
 
 	user, err := userTable.Get(lr.Username)
 	if err != nil {
+		httpRespond(w, 500, "internal server error")
 		return err
 	}
 
-	en := json.NewEncoder(w)
-	if err := en.Encode(user); err != nil {
+	if !auth.VerifyPassword(lr.Password, user.PasswordHashWithSalt) {
+		httpRespond(w, 401, "unauthenticated")
+		return fmt.Errorf("wrong password inputted")
+	}
+
+	token, err := auth.NewJWT(lr.Username)
+	if err != nil {
+		httpRespond(w, 500, "internal server error")
 		return err
 	}
+
+	w.Write([]byte(fmt.Sprintf(`{"token":"%v"}`, token)))
 
 	return nil
 }

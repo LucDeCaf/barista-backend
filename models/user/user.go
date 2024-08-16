@@ -3,10 +3,9 @@ package user
 import "database/sql"
 
 type User struct {
-	Username     string `json:"username"`
-	PasswordHash string `json:"password_hash"`
-	Salt         string `json:"salt"`
-	Role         string `json:"role"`
+	Username             string `json:"username"`
+	PasswordHashWithSalt string `json:"password_hash_with_salt"`
+	Role                 string `json:"role"`
 }
 
 type UserTable struct {
@@ -18,11 +17,11 @@ func NewUserTable(db *sql.DB) UserTable {
 }
 
 func (t UserTable) Get(username string) (User, error) {
-	row := t.db.QueryRow("SELECT username, password_hash, salt, role FROM users WHERE username=?;", username)
+	row := t.db.QueryRow("SELECT username, password_hash_with_salt, role FROM users WHERE username=?;", username)
 
 	var u User
 
-	if err := row.Scan(&u.Username, &u.PasswordHash, &u.Salt, &u.Role); err != nil {
+	if err := row.Scan(&u.Username, &u.PasswordHashWithSalt, &u.Role); err != nil {
 		return User{}, err
 	}
 
@@ -30,7 +29,7 @@ func (t UserTable) Get(username string) (User, error) {
 }
 
 func (t UserTable) GetAll() ([]User, error) {
-	rows, err := t.db.Query("SELECT username, password_hash, salt, role FROM users;")
+	rows, err := t.db.Query("SELECT username, password_hash_with_salt, role FROM users;")
 	if err != nil {
 		return nil, err
 	}
@@ -45,8 +44,7 @@ func (t UserTable) GetAll() ([]User, error) {
 
 		rows.Scan(
 			&u.Username,
-			&u.PasswordHash,
-			&u.Salt,
+			&u.PasswordHashWithSalt,
 			&u.Role,
 		)
 

@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Claims struct {
-	UserId int `json:"user_id"`
+	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
 
@@ -23,11 +24,11 @@ func init() {
 	jwtKey = key
 }
 
-func New(userId int) (string, error) {
+func NewJWT(username string) (string, error) {
 	// Expires in 24 hours
 	expiration := time.Now().Add(24 * time.Hour)
 	claims := &Claims{
-		UserId: userId,
+		Username: username,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiration),
 		},
@@ -60,4 +61,18 @@ func ExtractClaims(tokenString string) (*Claims, error) {
 	}
 
 	return claims, nil
+}
+
+func HashPassword(password string) (string, error) {
+	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
+}
+
+func VerifyPassword(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
