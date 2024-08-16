@@ -36,13 +36,17 @@ func main() {
 
 	port := *portPtr
 
-	http.Handle("/author", mw.Build(mw.ErrorLogger(authorHandler)))
-	http.Handle("/blog", mw.Build(mw.ErrorLogger(blogHandler)))
+	http.Handle("/author", middlewares(authorHandler))
+	http.Handle("/blog", middlewares(blogHandler))
 
 	log.Println("api listening on port " + port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Print(err)
 	}
+}
+
+func middlewares(h mw.Handler) http.Handler {
+	return mw.Build(mw.GenericErrorWriter(mw.ErrorLogger(h)))
 }
 
 func authorHandler(w http.ResponseWriter, r *http.Request) error {
@@ -59,7 +63,6 @@ func authorHandler(w http.ResponseWriter, r *http.Request) error {
 		if err := en.Encode(authors); err != nil {
 			return err
 		}
-
 	case http.MethodPost:
 		de := json.NewDecoder(r.Body)
 		de.DisallowUnknownFields()
