@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -12,9 +13,15 @@ import (
 	mw "github.com/LucDeCaf/go-simple-blog/middleware"
 	"github.com/LucDeCaf/go-simple-blog/models/author"
 	"github.com/LucDeCaf/go-simple-blog/models/blog"
+	"github.com/LucDeCaf/go-simple-blog/models/user"
 )
 
 var db *sql.DB
+
+type LoginRequest struct {
+	Username string `json:"username"`
+	Uassword string `json:"password"`
+}
 
 func init() {
 	var err error
@@ -38,6 +45,7 @@ func main() {
 
 	http.Handle("/author", middlewares(authorHandler))
 	http.Handle("/blog", middlewares(blogHandler))
+	http.Handle("/login", middlewares(loginHandler))
 
 	log.Println("api listening on port " + port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
@@ -112,6 +120,33 @@ func blogHandler(w http.ResponseWriter, r *http.Request) error {
 		if err := en.Encode(a); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) error {
+	if r.Method != http.MethodPost {
+		return fmt.Errorf("invalid method %v", r.Method)
+	}
+
+	var lr LoginRequest
+
+	de := json.NewDecoder(r.Body)
+	if err := de.Decode(&lr); err != nil {
+		return err
+	}
+
+	userTable := user.NewUserTable(db)
+
+	user, err := userTable.Get(lr.Username)
+	if err != nil {
+		return err
+	}
+
+	en := json.NewEncoder(w)
+	if err := en.Encode(user); err != nil {
+		return err
 	}
 
 	return nil

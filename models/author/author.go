@@ -18,9 +18,9 @@ func NewAuthorTable(db *sql.DB) AuthorTable {
 	return AuthorTable{db: db}
 }
 
-func (at AuthorTable) Get(id int) (Author, error) {
+func (t *AuthorTable) Get(id int) (Author, error) {
 	var a Author
-	if err := at.db.QueryRow("SELECT id, first_name, last_name FROM authors WHERE id = ?;", id).Scan(
+	if err := t.db.QueryRow("SELECT id, first_name, last_name FROM authors WHERE id = ?;", id).Scan(
 		&a.Id,
 		&a.Firstname,
 		&a.Lastname,
@@ -30,14 +30,12 @@ func (at AuthorTable) Get(id int) (Author, error) {
 	return a, nil
 }
 
-func (at AuthorTable) GetAll() ([]Author, error) {
-	// Select rows
-	rows, err := at.db.Query("SELECT id, first_name, last_name FROM authors;")
+func (t *AuthorTable) GetAll() ([]Author, error) {
+	rows, err := t.db.Query("SELECT id, first_name, last_name FROM authors;")
 	if err != nil {
 		return nil, err
 	}
 
-	// Read authors from rows into slice
 	authors := make([]Author, 0)
 	for {
 		if !rows.Next() {

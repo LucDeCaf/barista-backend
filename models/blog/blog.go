@@ -23,9 +23,9 @@ func NewBlogTable(db *sql.DB) BlogTable {
 	return BlogTable{db: db}
 }
 
-func (bt BlogTable) Get(id int) (Blog, error) {
+func (t *BlogTable) Get(id int) (Blog, error) {
 	var b Blog
-	if err := bt.db.QueryRow("SELECT id, author_id, title, content, created_at, updated_at FROM blogs WHERE id = ?;", id).Scan(
+	if err := t.db.QueryRow("SELECT id, author_id, title, content, created_at, updated_at FROM blogs WHERE id = ?;", id).Scan(
 		&b.Id,
 		&b.AuthorId,
 		&b.Title,
@@ -38,14 +38,12 @@ func (bt BlogTable) Get(id int) (Blog, error) {
 	return b, nil
 }
 
-func (at BlogTable) GetAll() ([]Blog, error) {
-	// Select rows
-	rows, err := at.db.Query("SELECT id, author_id, title, content, created_at, updated_at FROM blogs;")
+func (t *BlogTable) GetAll() ([]Blog, error) {
+	rows, err := t.db.Query("SELECT id, author_id, title, content, created_at, updated_at FROM blogs;")
 	if err != nil {
 		return nil, err
 	}
 
-	// Read blogs from rows into slice
 	blogs := make([]Blog, 0)
 	for {
 		if !rows.Next() {
