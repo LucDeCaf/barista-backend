@@ -1,3 +1,4 @@
+// TODO: Implement table interface + TableError type for more accurate status codes in responses
 package main
 
 import (
@@ -207,9 +208,10 @@ func authorsIdHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	authorTable := author.NewAuthorTable(db)
+
 	switch r.Method {
 	case http.MethodGet:
-		authorTable := author.NewAuthorTable(db)
 		a, err := authorTable.Get(id)
 		if err != nil {
 			httpRespond(w, 404, "not found")
@@ -217,6 +219,26 @@ func authorsIdHandler(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		if err = json.NewEncoder(w).Encode(a); err != nil {
+			return err
+		}
+
+	case http.MethodDelete:
+		if user, err := extractUser(r); err != nil {
+			httpRespond(w, err.Code, err.Message)
+			return err
+		} else if user.Role != "admin" {
+			httpRespond(w, 403, "unauthorized")
+			return err
+		}
+
+		a, err := authorTable.Delete(id)
+		if err != nil {
+			httpRespond(w, 500, "internal server error")
+			return err
+		}
+
+		w.WriteHeader(200)
+		if err := json.NewEncoder(w).Encode(a); err != nil {
 			return err
 		}
 
@@ -236,9 +258,10 @@ func blogsIdHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	blogTable := blog.NewBlogTable(db)
+
 	switch r.Method {
 	case http.MethodGet:
-		blogTable := blog.NewBlogTable(db)
 		b, err := blogTable.Get(id)
 		if err != nil {
 			httpRespond(w, 404, "not found")
@@ -246,6 +269,26 @@ func blogsIdHandler(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		if err = json.NewEncoder(w).Encode(b); err != nil {
+			return err
+		}
+
+	case http.MethodDelete:
+		if user, err := extractUser(r); err != nil {
+			httpRespond(w, err.Code, err.Message)
+			return err
+		} else if user.Role != "admin" {
+			httpRespond(w, 403, "unauthorized")
+			return err
+		}
+
+		b, err := blogTable.Delete(id)
+		if err != nil {
+			httpRespond(w, 500, "internal server error")
+			return err
+		}
+		
+		w.WriteHeader(200)
+		if err := json.NewEncoder(w).Encode(b); err != nil {
 			return err
 		}
 

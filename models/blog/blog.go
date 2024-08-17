@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// TODO: This is error-prone to Scan from, possibly create func `ScanDefault(*sql.Row, *Blog) error`
+const PubliclyReturned string = "id,author_id,title,content,created_at,updated_at"
+
 type Blog struct {
 	Id        int           `json:"id"`
 	AuthorId  int           `json:"author_id"`
@@ -25,7 +28,7 @@ func NewBlogTable(db *sql.DB) BlogTable {
 
 func (t *BlogTable) Get(id int) (*Blog, error) {
 	var b Blog
-	if err := t.db.QueryRow("SELECT id, author_id, title, content, created_at, updated_at FROM blogs WHERE id = ?;", id).Scan(
+	if err := t.db.QueryRow("SELECT "+PubliclyReturned+" FROM blogs WHERE id = ?;", id).Scan(
 		&b.Id,
 		&b.AuthorId,
 		&b.Title,
@@ -39,7 +42,7 @@ func (t *BlogTable) Get(id int) (*Blog, error) {
 }
 
 func (t *BlogTable) GetAll() ([]Blog, error) {
-	rows, err := t.db.Query("SELECT id, author_id, title, content, created_at, updated_at FROM blogs;")
+	rows, err := t.db.Query("SELECT " + PubliclyReturned + " FROM blogs;")
 	if err != nil {
 		return nil, err
 	}
@@ -68,12 +71,22 @@ func (t *BlogTable) GetAll() ([]Blog, error) {
 }
 
 func (t *BlogTable) Insert(blog *Blog) (*Blog, error) {
-	row := t.db.QueryRow("INSERT INTO blogs (author_id,title,content) VALUES (?,?,?) RETURNING id,author_id,title,content,created_at,updated_at;", blog.AuthorId, blog.Title, blog.Content)
+	row := t.db.QueryRow("INSERT INTO blogs (author_id,title,content) VALUES (?,?,?) RETURNING "+PubliclyReturned+";", blog.AuthorId, blog.Title, blog.Content)
 
 	var b Blog
 	if err := row.Scan(&b.Id, &b.AuthorId, &b.Title, &b.Content, &b.CreatedAt, &b.UpdatedAt); err != nil {
 		return nil, err
 	}
 
+	return &b, nil
+}
+
+func (t *BlogTable) Delete(blogId int) (*Blog, error) {
+	row := t.db.QueryRow("DELETE FROM blogs WHERE id = ? RETURNING " + PubliclyReturned + ";", blogId)
+
+	var b Blog
+	if err := row.Scan(&b.Id, &b.AuthorId, &b.Title, &b.Content, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		return nil, err
+	}
 	return &b, nil
 }
