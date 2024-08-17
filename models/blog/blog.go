@@ -23,7 +23,7 @@ func NewBlogTable(db *sql.DB) BlogTable {
 	return BlogTable{db: db}
 }
 
-func (t *BlogTable) Get(id int) (Blog, error) {
+func (t *BlogTable) Get(id int) (*Blog, error) {
 	var b Blog
 	if err := t.db.QueryRow("SELECT id, author_id, title, content, created_at, updated_at FROM blogs WHERE id = ?;", id).Scan(
 		&b.Id,
@@ -33,9 +33,9 @@ func (t *BlogTable) Get(id int) (Blog, error) {
 		&b.CreatedAt,
 		&b.UpdatedAt,
 	); err != nil {
-		return Blog{}, err
+		return nil, err
 	}
-	return b, nil
+	return &b, nil
 }
 
 func (t *BlogTable) GetAll() ([]Blog, error) {
@@ -65,4 +65,15 @@ func (t *BlogTable) GetAll() ([]Blog, error) {
 	}
 
 	return blogs, rows.Err()
+}
+
+func (t *BlogTable) Insert(blog *Blog) (*Blog, error) {
+	row := t.db.QueryRow("INSERT INTO blogs (author_id,title,content) VALUES (?,?,?) RETURNING id,author_id,title,content,created_at,updated_at;", blog.AuthorId, blog.Title, blog.Content)
+
+	var b Blog
+	if err := row.Scan(&b.Id, &b.AuthorId, &b.Title, &b.Content, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		return nil, err
+	}
+
+	return &b, nil
 }

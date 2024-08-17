@@ -18,16 +18,16 @@ func NewAuthorTable(db *sql.DB) AuthorTable {
 	return AuthorTable{db: db}
 }
 
-func (t *AuthorTable) Get(id int) (Author, error) {
+func (t *AuthorTable) Get(id int) (*Author, error) {
 	var a Author
 	if err := t.db.QueryRow("SELECT id, first_name, last_name FROM authors WHERE id = ?;", id).Scan(
 		&a.Id,
 		&a.Firstname,
 		&a.Lastname,
 	); err != nil {
-		return Author{}, err
+		return nil, err
 	}
-	return a, nil
+	return &a, nil
 }
 
 func (t *AuthorTable) GetAll() ([]Author, error) {
@@ -52,13 +52,13 @@ func (t *AuthorTable) GetAll() ([]Author, error) {
 	return authors, rows.Err()
 }
 
-func (t *AuthorTable) Insert(author Author) (Author, error) {
+func (t *AuthorTable) Insert(author *Author) (*Author, error) {
 	row := t.db.QueryRow("INSERT INTO authors (first_name,last_name) VALUES (?,?) RETURNING id,first_name,last_name;", author.Firstname, author.Lastname)
 
 	var a Author
 	if err := row.Scan(&a.Id, &a.Firstname, &a.Lastname); err != nil {
-		return Author{}, err
+		return nil, err
 	}
 
-	return a, nil
+	return &a, nil
 }

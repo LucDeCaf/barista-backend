@@ -100,6 +100,7 @@ func authorHandler(w http.ResponseWriter, r *http.Request) error {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
+
 	case http.MethodPost:
 		if user, err := extractUser(r); err != nil {
 			httpRespond(w, err.Code, err.Message)
@@ -112,7 +113,7 @@ func authorHandler(w http.ResponseWriter, r *http.Request) error {
 		de := json.NewDecoder(r.Body)
 		de.DisallowUnknownFields()
 
-		var a author.Author
+		var a *author.Author
 
 		if err := de.Decode(&a); err != nil {
 			httpRespond(w, 400, "bad request")
@@ -152,20 +153,35 @@ func blogHandler(w http.ResponseWriter, r *http.Request) error {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
+
 	case http.MethodPost:
+		if user, err := extractUser(r); err != nil {
+			httpRespond(w, err.Code, err.Message)
+			return err
+		} else if user.Role != "admin" {
+			httpRespond(w, 403, "unauthorized")
+			return err
+		}
+
 		de := json.NewDecoder(r.Body)
 		de.DisallowUnknownFields()
 
-		var a author.Author
+		var b *blog.Blog
 
-		if err := de.Decode(&a); err != nil {
+		if err := de.Decode(&b); err != nil {
 			httpRespond(w, 400, "bad request")
 			return err
 		}
 
-		en := json.NewEncoder(w)
-		if err := en.Encode(a); err != nil {
+		blogTable := blog.NewBlogTable(db)
+		b, err := blogTable.Insert(b)
+		if err != nil {
 			httpRespond(w, 500, "internal server error")
+			return err
+		}
+
+		w.WriteHeader(201)
+		if err := json.NewEncoder(w).Encode(b); err != nil {
 			return err
 		}
 	default:
