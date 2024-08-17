@@ -46,11 +46,14 @@ func main() {
 
 	port := *portPtr
 
-	http.Handle("/authors", middlewares(authorsHandler))
-	http.Handle("/authors/{id}", middlewares(authorsIdHandler))
-	http.Handle("/blogs", middlewares(blogsHandler))
-	http.Handle("/blogs/{id}", middlewares(blogsIdHandler))
-	http.Handle("/login", middlewares(loginHandler))
+	v1 := http.NewServeMux()
+	v1.Handle("/authors", middlewares(authorsHandler))
+	v1.Handle("/authors/{id}", middlewares(authorsIdHandler))
+	v1.Handle("/blogs", middlewares(blogsHandler))
+	v1.Handle("/blogs/{id}", middlewares(blogsIdHandler))
+	v1.Handle("/login", middlewares(loginHandler))
+
+	http.Handle("/v1/", http.StripPrefix("/v1", v1))
 
 	log.Println("api listening on port " + port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
