@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -45,8 +46,10 @@ func main() {
 
 	port := *portPtr
 
-	http.Handle("/author", middlewares(authorHandler))
-	http.Handle("/blog", middlewares(blogHandler))
+	http.Handle("/authors", middlewares(authorsHandler))
+	http.Handle("/authors/{id}", middlewares(authorsIdHandler))
+	http.Handle("/blogs", middlewares(blogsHandler))
+	http.Handle("/blogs/{id}", middlewares(blogsIdHandler))
 	http.Handle("/login", middlewares(loginHandler))
 
 	log.Println("api listening on port " + port)
@@ -84,7 +87,7 @@ func extractUser(r *http.Request) (*user.User, *errors.HttpError) {
 	return &user, nil
 }
 
-func authorHandler(w http.ResponseWriter, r *http.Request) error {
+func authorsHandler(w http.ResponseWriter, r *http.Request) error {
 	authorTable := author.NewAuthorTable(db)
 
 	switch r.Method {
@@ -132,12 +135,13 @@ func authorHandler(w http.ResponseWriter, r *http.Request) error {
 		}
 	default:
 		httpRespond(w, 405, "method not allowed")
+		return fmt.Errorf("method '%v' not allowed", r.Method)
 	}
 
 	return nil
 }
 
-func blogHandler(w http.ResponseWriter, r *http.Request) error {
+func blogsHandler(w http.ResponseWriter, r *http.Request) error {
 	blogTable := blog.NewBlogTable(db)
 
 	switch r.Method {
@@ -186,6 +190,65 @@ func blogHandler(w http.ResponseWriter, r *http.Request) error {
 		}
 	default:
 		httpRespond(w, 405, "method not allowed")
+		return fmt.Errorf("method '%v' not allowed", r.Method)
+	}
+
+	return nil
+}
+
+func authorsIdHandler(w http.ResponseWriter, r *http.Request) error {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		httpRespond(w, 400, "bad request")
+		return err
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		authorTable := author.NewAuthorTable(db)
+		a, err := authorTable.Get(id)
+		if err != nil {
+			httpRespond(w, 404, "not found")
+			return err
+		}
+
+		if err = json.NewEncoder(w).Encode(a); err != nil {
+			return err
+		}
+
+	default:
+		httpRespond(w, 405, "method not allowed")
+		return fmt.Errorf("method '%v' not allowed", r.Method)
+	}
+
+	return nil
+}
+
+func blogsIdHandler(w http.ResponseWriter, r *http.Request) error {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		httpRespond(w, 400, "bad request")
+		return err
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		blogTable := blog.NewBlogTable(db)
+		b, err := blogTable.Get(id)
+		if err != nil {
+			httpRespond(w, 404, "not found")
+			return err
+		}
+
+		if err = json.NewEncoder(w).Encode(b); err != nil {
+			return err
+		}
+
+	default:
+		httpRespond(w, 405, "method not allowed")
+		return fmt.Errorf("method '%v' not allowed", r.Method)
 	}
 
 	return nil
