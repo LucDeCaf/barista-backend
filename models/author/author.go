@@ -51,3 +51,14 @@ func (t *AuthorTable) GetAll() ([]Author, error) {
 
 	return authors, rows.Err()
 }
+
+func (t *AuthorTable) Insert(author Author) (Author, error) {
+	row := t.db.QueryRow("INSERT INTO authors (first_name,last_name) VALUES (?,?) RETURNING id,first_name,last_name;", author.Firstname, author.Lastname)
+
+	var a Author
+	if err := row.Scan(&a.Id, &a.Firstname, &a.Lastname); err != nil {
+		return Author{}, err
+	}
+
+	return a, nil
+}

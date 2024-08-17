@@ -3,6 +3,8 @@ package auth
 import (
 	"crypto/rand"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -42,6 +44,17 @@ func NewJWT(username string) (string, error) {
 	return tokenString, nil
 }
 
+func ExtractJWT(r *http.Request) (string, error) {
+	authHeader := r.Header.Get("Authorization")
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return "", fmt.Errorf("invalid Authorization header")
+	}
+
+	return parts[1], nil
+}
+
 func ExtractClaims(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 
@@ -70,6 +83,20 @@ func HashPassword(password string) (string, error) {
 	}
 
 	return string(b), nil
+}
+
+func ExtractUsername(r *http.Request) (string, error) {
+	token, err := ExtractJWT(r)
+	if err != nil {
+		return "", err
+	}
+
+	claims, err := ExtractClaims(token)
+	if err != nil {
+		return "", err
+	}
+
+	return claims.Username, nil
 }
 
 func VerifyPassword(password, hash string) bool {

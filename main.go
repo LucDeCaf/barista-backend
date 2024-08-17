@@ -11,6 +11,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/LucDeCaf/go-simple-blog/auth"
+	"github.com/LucDeCaf/go-simple-blog/errors"
 	mw "github.com/LucDeCaf/go-simple-blog/middleware"
 	"github.com/LucDeCaf/go-simple-blog/models/author"
 	"github.com/LucDeCaf/go-simple-blog/models/blog"
@@ -63,6 +64,26 @@ func httpRespond(w http.ResponseWriter, code int, message string) {
 	w.Write([]byte(fmt.Sprintf("%v %v\n", code, message)))
 }
 
+func extractUser(r *http.Request) (*user.User, *errors.HttpError) {
+	token, err := auth.ExtractJWT(r)
+	if err != nil {
+		return nil, errors.NewHttpError(401, "unauthenticated")
+	}
+
+	claims, err := auth.ExtractClaims(token)
+	if err != nil {
+		return nil, errors.NewHttpError(401, "unauthenticated")
+	}
+
+	userTable := user.NewUserTable(db)
+	user, err := userTable.Get(claims.Username)
+	if err != nil {
+		return nil, errors.NewHttpError(500, "internal server error")
+	}
+
+	return &user, nil
+}
+
 func authorHandler(w http.ResponseWriter, r *http.Request) error {
 	authorTable := author.NewAuthorTable(db)
 
@@ -80,6 +101,14 @@ func authorHandler(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 	case http.MethodPost:
+		if user, err := extractUser(r); err != nil {
+			httpRespond(w, err.Code, err.Message)
+			return err
+		} else if user.Role != "admin" {
+			httpRespond(w, 403, "unauthorized")
+			return err
+		}
+
 		de := json.NewDecoder(r.Body)
 		de.DisallowUnknownFields()
 
@@ -90,9 +119,14 @@ func authorHandler(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
-		en := json.NewEncoder(w)
-		if err := en.Encode(a); err != nil {
+		a, err := authorTable.Insert(a)
+		if err != nil {
 			httpRespond(w, 500, "internal server error")
+			return err
+		}
+
+		w.WriteHeader(201)
+		if err := json.NewEncoder(w).Encode(a); err != nil {
 			return err
 		}
 	default:
