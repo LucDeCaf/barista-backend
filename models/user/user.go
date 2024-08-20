@@ -1,15 +1,44 @@
 package user
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+)
+
+// TODO: This is error-prone to Scan from, possibly create func `ScanDefault(*sql.Row, *Blog) error`
+const PubliclyReturned string = "username,password_hash_with_salt,role"
 
 type User struct {
 	Username             string `json:"username"`
 	PasswordHashWithSalt string `json:"password_hash_with_salt"`
-	Role                 string `json:"role"`
+	Role                 Role   `json:"role"`
 }
 
 type UserTable struct {
 	db *sql.DB
+}
+
+type Role string
+
+const (
+	RoleAdmin Role = "admin"
+	RoleUser  Role = "user"
+)
+
+func NewUser(username, passwordHash string, role Role) *User {
+	return &User{
+		Username:             username,
+		PasswordHashWithSalt: passwordHash,
+		Role:                 role,
+	}
+}
+
+func (u *User) Fields() []any {
+	return []any{&u.Username, &u.PasswordHashWithSalt, &u.Role}
+}
+
+func (u *User) Values() []any {
+	return []any{u.Username, u.PasswordHashWithSalt, u.Role}
 }
 
 func NewUserTable(db *sql.DB) UserTable {
@@ -52,4 +81,17 @@ func (t UserTable) GetAll() ([]User, error) {
 	}
 
 	return users, rows.Err()
+}
+
+func (t UserTable) Insert(user *User) (*User, error) {
+	query := fmt.Sprintf("INSERT INTO users (username,password_hash_with_salt,role) VALUES (?,?,?) RETURNING %v;", PubliclyReturned)
+
+	var u User
+
+	row := t.db.QueryRow(query, user.Values()...)
+	if err := row.Scan(u.Fields()...); err != nil {
+		return nil, err
+	}
+
+	return &u, nil
 }
