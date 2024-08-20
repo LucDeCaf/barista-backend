@@ -92,7 +92,7 @@ func extractUser(r *http.Request) (*user.User, *e.HttpError) {
 		return nil, e.NewHttpError(500, "internal server error")
 	}
 
-	return &user, nil
+	return user, nil
 }
 
 func authorsHandler(w http.ResponseWriter, r *http.Request) error {

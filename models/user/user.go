@@ -3,6 +3,8 @@ package user
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/LucDeCaf/go-simple-blog/models"
 )
 
 // TODO: This is error-prone to Scan from, possibly create func `ScanDefault(*sql.Row, *Blog) error`
@@ -33,37 +35,41 @@ func NewUser(username, passwordHash string, role Role) *User {
 	}
 }
 
+func (u *User) FieldNames() string {
+	return "username,password_hash_with_salt,role"
+}
+
 func (u *User) Fields() []any {
 	return []any{&u.Username, &u.PasswordHashWithSalt, &u.Role}
 }
 
 func (u *User) Values() []any {
-	return []any{u.Username, u.PasswordHashWithSalt, u.Role}
+	return models.ValuesFromFields(u)
 }
 
 func NewUserTable(db *sql.DB) UserTable {
 	return UserTable{db: db}
 }
 
-func (t UserTable) Get(username string) (User, error) {
+func (t UserTable) Get(username string) (*User, error) {
 	row := t.db.QueryRow("SELECT username, password_hash_with_salt, role FROM users WHERE username=?;", username)
 
 	var u User
 
 	if err := row.Scan(&u.Username, &u.PasswordHashWithSalt, &u.Role); err != nil {
-		return User{}, err
+		return nil, err
 	}
 
-	return u, nil
+	return &u, nil
 }
 
-func (t UserTable) GetAll() ([]User, error) {
+func (t UserTable) GetAll() ([]*User, error) {
 	rows, err := t.db.Query("SELECT username, password_hash_with_salt, role FROM users;")
 	if err != nil {
 		return nil, err
 	}
 
-	users := make([]User, 0)
+	users := make([]*User, 0)
 	for {
 		if !rows.Next() {
 			break
@@ -77,10 +83,23 @@ func (t UserTable) GetAll() ([]User, error) {
 			&u.Role,
 		)
 
-		users = append(users, u)
+		users = append(users, &u)
 	}
 
 	return users, rows.Err()
+}
+
+func (t UserTable) Delete(username string) (*User, error) {
+	query := fmt.Sprintf("DELETE FROM users WHERE id=? RETURNING %v;", PubliclyReturned)
+
+	var u User
+
+	row := t.db.QueryRow(query, username)
+	if err := row.Scan(u.Fields()...); err != nil {
+		return nil, err
+	}
+
+	return &u, nil
 }
 
 func (t UserTable) Insert(user *User) (*User, error) {
