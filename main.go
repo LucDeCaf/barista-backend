@@ -1,4 +1,3 @@
-// TODO: Implement table interface
 package main
 
 import (
@@ -16,25 +15,14 @@ import (
 	"github.com/LucDeCaf/go-simple-blog/auth"
 	e "github.com/LucDeCaf/go-simple-blog/errors"
 	mw "github.com/LucDeCaf/go-simple-blog/middleware"
-	"github.com/LucDeCaf/go-simple-blog/models/author"
-	"github.com/LucDeCaf/go-simple-blog/models/blog"
-	"github.com/LucDeCaf/go-simple-blog/models/user"
+	"github.com/LucDeCaf/go-simple-blog/models/authors"
+	"github.com/LucDeCaf/go-simple-blog/models/blogs"
+	"github.com/LucDeCaf/go-simple-blog/models/users"
 )
-
-var db *sql.DB
 
 type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
-}
-
-func init() {
-	var err error
-
-	db, err = sql.Open("sqlite3", "./db.db")
-	if err != nil {
-		log.Fatal("failed to open db:", err)
-	}
 }
 
 func main() {
@@ -75,70 +63,70 @@ func httpRespond(w http.ResponseWriter, code int, message string) {
 	w.Write([]byte(fmt.Sprintf("%v %v\n", code, message)))
 }
 
-func extractUser(r *http.Request) (*user.User, *e.HttpError) {
+func extractUser(r *http.Request) (users.User, *e.HttpError) {
 	token, err := auth.ExtractJWT(r)
 	if err != nil {
-		return nil, e.NewHttpError(401, "unauthenticated")
+		return users.User{}, e.NewHttpError(401, "unauthenticated")
 	}
 
 	claims, err := auth.ExtractClaims(token)
 	if err != nil {
-		return nil, e.NewHttpError(401, "unauthenticated")
+		return users.User{}, e.NewHttpError(401, "unauthenticated")
 	}
 
-	userTable := user.NewUserTable(db)
-	user, err := userTable.Get(claims.Username)
+	user, err := users.Get(claims.Username)
 	if err != nil {
-		return nil, e.NewHttpError(500, "internal server error")
+		return user, e.NewHttpError(500, "internal server error")
 	}
 
 	return user, nil
 }
 
 func authorsHandler(w http.ResponseWriter, r *http.Request) error {
-	authorTable := author.NewAuthorTable(db)
-
 	switch r.Method {
 	case http.MethodGet:
-		authors, err := authorTable.GetAll()
+		allAuthors, err := authors.GetAll()
 		if err != nil {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 		en := json.NewEncoder(w)
-		if err := en.Encode(authors); err != nil {
+		if err := en.Encode(allAuthors); err != nil {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 	case http.MethodPost:
-		if u, err := extractUser(r); err != nil {
-			httpRespond(w, err.Code, err.Message)
-			return err
-		} else if u.Role != user.RoleAdmin {
+		user, httpErr := extractUser(r)
+		if httpErr != nil {
+			httpRespond(w, httpErr.Code, httpErr.Message)
+			return httpErr
+		}
+
+		if user.Role != users.RoleAdmin {
 			httpRespond(w, 403, "unauthorized")
-			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", u.Role))
+			return e.NewHttpError(403, "unauthorized")
 		}
 
 		de := json.NewDecoder(r.Body)
 		de.DisallowUnknownFields()
 
-		var a *author.Author
+		var author authors.Author
 
-		if err := de.Decode(&a); err != nil {
+		if err := de.Decode(&author); err != nil {
 			httpRespond(w, 400, "bad request")
 			return err
 		}
 
-		a, err := authorTable.Insert(a)
+		author, err := authors.Insert(author)
 		if err != nil {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 		w.WriteHeader(201)
-		if err := json.NewEncoder(w).Encode(a); err != nil {
+		if err := json.NewEncoder(w).Encode(author); err != nil {
 			return err
 		}
 	default:
@@ -150,50 +138,49 @@ func authorsHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func blogsHandler(w http.ResponseWriter, r *http.Request) error {
-	blogTable := blog.NewBlogTable(db)
-
 	switch r.Method {
 	case http.MethodGet:
-		blogs, err := blogTable.GetAll()
+		allBlogs, err := blogs.GetAll()
 		if err != nil {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 		en := json.NewEncoder(w)
-		if err := en.Encode(blogs); err != nil {
+		if err := en.Encode(allBlogs); err != nil {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 	case http.MethodPost:
-		if u, err := extractUser(r); err != nil {
-			httpRespond(w, err.Code, err.Message)
-			return err
-		} else if u.Role != user.RoleAdmin {
+		user, httpErr := extractUser(r)
+		if httpErr != nil {
+			httpRespond(w, httpErr.Code, httpErr.Message)
+			return httpErr
+		}
+
+		if user.Role != users.RoleAdmin {
 			httpRespond(w, 403, "unauthorized")
-			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", u.Role))
+			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", user.Role))
 		}
 
 		de := json.NewDecoder(r.Body)
 		de.DisallowUnknownFields()
 
-		var b *blog.Blog
-
-		if err := de.Decode(&b); err != nil {
+		var blog blogs.Blog
+		if err := de.Decode(&blog); err != nil {
 			httpRespond(w, 400, "bad request")
 			return err
 		}
 
-		blogTable := blog.NewBlogTable(db)
-		b, err := blogTable.Insert(b)
+		blog, err := blogs.Insert(blog)
 		if err != nil {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 		w.WriteHeader(201)
-		if err := json.NewEncoder(w).Encode(b); err != nil {
+		if err := json.NewEncoder(w).Encode(blog); err != nil {
 			return err
 		}
 	default:
@@ -212,37 +199,38 @@ func authorsIdHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	authorTable := author.NewAuthorTable(db)
-
 	switch r.Method {
 	case http.MethodGet:
-		a, err := authorTable.Get(id)
+		author, err := authors.Get(id)
 		if err != nil {
 			httpRespond(w, 404, "not found")
 			return err
 		}
 
-		if err = json.NewEncoder(w).Encode(a); err != nil {
+		if err = json.NewEncoder(w).Encode(author); err != nil {
 			return err
 		}
 
 	case http.MethodDelete:
-		if u, err := extractUser(r); err != nil {
-			httpRespond(w, err.Code, err.Message)
-			return err
-		} else if u.Role != user.RoleAdmin {
-			httpRespond(w, 403, "unauthorized")
-			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", u.Role))
+		user, httpErr := extractUser(r)
+		if httpErr != nil {
+			httpRespond(w, httpErr.Code, httpErr.Message)
+			return httpErr
 		}
 
-		a, err := authorTable.Delete(id)
+		if user.Role != users.RoleAdmin {
+			httpRespond(w, 403, "unauthorized")
+			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", user.Role))
+		}
+
+		author, err := authors.Delete(id)
 		if err != nil {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 		w.WriteHeader(200)
-		if err := json.NewEncoder(w).Encode(a); err != nil {
+		if err := json.NewEncoder(w).Encode(author); err != nil {
 			return err
 		}
 
@@ -262,37 +250,38 @@ func blogsIdHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	blogTable := blog.NewBlogTable(db)
-
 	switch r.Method {
 	case http.MethodGet:
-		b, err := blogTable.Get(id)
+		blog, err := blogs.Get(id)
 		if err != nil {
 			httpRespond(w, 404, "not found")
 			return err
 		}
 
-		if err = json.NewEncoder(w).Encode(b); err != nil {
+		if err = json.NewEncoder(w).Encode(blog); err != nil {
 			return err
 		}
 
 	case http.MethodDelete:
-		if u, err := extractUser(r); err != nil {
-			httpRespond(w, err.Code, err.Message)
-			return err
-		} else if u.Role != user.RoleAdmin {
-			httpRespond(w, 403, "unauthorized")
-			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", u.Role))
+		user, httpErr := extractUser(r)
+		if httpErr != nil {
+			httpRespond(w, httpErr.Code, httpErr.Message)
+			return httpErr
 		}
 
-		b, err := blogTable.Delete(id)
+		if user.Role != users.RoleAdmin {
+			httpRespond(w, 403, "unauthorized")
+			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", user.Role))
+		}
+
+		blog, err := blogs.Delete(id)
 		if err != nil {
 			httpRespond(w, 500, "internal server error")
 			return err
 		}
 
 		w.WriteHeader(200)
-		if err := json.NewEncoder(w).Encode(b); err != nil {
+		if err := json.NewEncoder(w).Encode(blog); err != nil {
 			return err
 		}
 
@@ -318,9 +307,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	userTable := user.NewUserTable(db)
-
-	user, err := userTable.Get(lr.Username)
+	user, err := users.Get(lr.Username)
 	if err != nil {
 		httpRespond(w, 500, "internal server error")
 		return err
@@ -354,8 +341,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	userTable := user.NewUserTable(db)
-	_, err := userTable.Get(lr.Username)
+	_, err := users.Get(lr.Username)
 
 	// Successful return means user already exists
 	if err == nil {
@@ -376,14 +362,18 @@ func registerHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	u, err := userTable.Insert(user.NewUser(lr.Username, pwHash, user.RoleUser))
+	user, err := users.Insert(users.User{
+		Username: lr.Username,
+		PasswordHashWithSalt: pwHash,
+		Role: users.RoleUser,
+	})
 	if err != nil {
 		httpRespond(w, 500, "internal server error")
 		return err
 	}
 
 	w.WriteHeader(201)
-	if err := json.NewEncoder(w).Encode(u); err != nil {
+	if err := json.NewEncoder(w).Encode(user); err != nil {
 		return err
 	}
 
