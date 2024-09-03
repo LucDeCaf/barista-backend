@@ -82,10 +82,10 @@ func Insert(blog Blog) (Blog, error) {
 }
 
 func Update(blog Blog) (Blog, error) {
-	const query string = "INSERT INTO blogs (author_id,title,content) VALUES (?,?,?) WHERE id=? RETURNING id,author_id,title,content,created_at,updated_at;"
+	const query string = "INSERT INTO blogs (author_id,title,content,updated_at) VALUES (?,?,?,?) WHERE id=? RETURNING id,author_id,title,content,created_at,updated_at;"
 
 	var b Blog
-	err := db.DB.QueryRow(query, blog.AuthorId, blog.Title, blog.Content, blog.Id).Scan(
+	err := db.DB.QueryRow(query, blog.AuthorId, blog.Title, blog.Content, time.Now(), blog.Id).Scan(
 		&b.Id,
 		&b.AuthorId,
 		&b.Title,
