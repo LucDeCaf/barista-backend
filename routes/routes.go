@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/LucDeCaf/go-simple-blog/models/authors"
 	"github.com/LucDeCaf/go-simple-blog/models/blogs"
 	"github.com/LucDeCaf/go-simple-blog/models/users"
+	"github.com/LucDeCaf/go-simple-blog/sanitizer"
 )
 
 type loginRequest struct {
@@ -135,6 +137,9 @@ func BlogsHandler(w http.ResponseWriter, r *http.Request) error {
 			httpRespond(w, 400, "bad request")
 			return err
 		}
+
+		// Sanitize HTML content using UGC (User Generated Content) sanitizer
+		blog.Content = template.HTML(sanitizer.Sanitize(string(blog.Content)))
 
 		blog, err := blogs.Insert(blog)
 		if err != nil {
