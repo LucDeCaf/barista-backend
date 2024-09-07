@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/LucDeCaf/go-simple-blog/auth"
 	e "github.com/LucDeCaf/go-simple-blog/errors"
@@ -263,21 +264,32 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) error {
 
 	var lr loginRequest
 
-	de := json.NewDecoder(r.Body)
-	if err := de.Decode(&lr); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&lr); err != nil {
 		httpRespond(w, 400, "bad request")
 		return err
 	}
 
+	lr.Username = strings.TrimSpace(lr.Username)
+	lr.Password = strings.TrimSpace(lr.Password)
+
+	if lr.Username == "" || lr.Password == "" {
+		httpRespond(w, 400, "incorrect username or password")
+		return fmt.Errorf("missing username or password ('%v', '%v')", lr.Username, lr.Password)
+	}
+
 	user, err := users.Get(lr.Username)
 	if err != nil {
-		httpRespond(w, 500, "internal server error")
+		if errors.Is(err, sql.ErrNoRows) {
+			httpRespond(w, 400, "incorrect username or password")
+		} else {
+			httpRespond(w, 500, "internal server error")
+		}
 		return err
 	}
 
 	if !auth.VerifyPassword(lr.Password, user.PasswordHashWithSalt) {
-		httpRespond(w, 401, "unauthenticated")
-		return fmt.Errorf("wrong password inputted")
+		httpRespond(w, 400, "incorrect username or password")
+		return fmt.Errorf("incorrect password")
 	}
 
 	token, err := auth.NewJWT(lr.Username)
@@ -286,7 +298,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	w.Write([]byte(fmt.Sprintf(`{"token":"%v"}`, token)))
+	w.Write([]byte(token))
 
 	return nil
 }
@@ -303,16 +315,36 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	// Remove leading or trailing whitespace
+	lr.Username = strings.TrimSpace(lr.Username)
+	lr.Password = strings.TrimSpace(lr.Password)
+
+	// Prevent empty username / password
+	if lr.Username == "" || lr.Password == "" {
+		httpRespond(w, 400, "missing username or password")
+		return fmt.Errorf("missing username or password ('%v', '%v')", lr.Username, lr.Password)
+	}
+
+	// Password requirements
+	if len(lr.Password) < 8 {
+		httpRespond(w, 400, "password must be at least 8 characters")
+		return fmt.Errorf("password too short")
+	}
+
 	_, err := users.Get(lr.Username)
 
-	// Successful return means user already exists
+	// Successful return means username already in use
 	if err == nil {
-		httpRespond(w, 400, "user already exists")
+		httpRespond(w, 400, "username already exists")
 		return fmt.Errorf("username already exists")
 	}
 
-	// ErrNoRows means record doesn't exist and is required
-	// to avoid overwriting users
+	/*
+		If ErrNoRows is returned then that means username can be used
+		and therefore ErrNoRows is actually a success case.
+
+		If any other error occurs, then it is an actual server error.
+	*/
 	if !errors.Is(err, sql.ErrNoRows) {
 		httpRespond(w, 500, "internal server error")
 		return err
