@@ -3,27 +3,20 @@ package users
 import "github.com/LucDeCaf/go-simple-blog/db"
 
 type User struct {
-	Username             string `json:"username"`
-	PasswordHashWithSalt string `json:"password_hash_with_salt"`
-	Role                 Role   `json:"role"`
+	Username     string `json:"username"`
+	PasswordHash string `json:"password_hash"`
+	Role         string `json:"role"`
 }
 
-type Role string
-
-const (
-	RoleAdmin Role = "admin"
-	RoleUser  Role = "user"
-)
-
 func Get(username string) (User, error) {
-	const query string = "SELECT username,password_hash_with_salt,role FROM users WHERE username=?;"
+	const query string = "SELECT username,password_hash,role FROM users WHERE username=?;"
 
 	row := db.DB.QueryRow(query, username)
 
 	var u User
 	err := row.Scan(
 		&u.Username,
-		&u.PasswordHashWithSalt,
+		&u.PasswordHash,
 		&u.Role,
 	)
 
@@ -31,7 +24,7 @@ func Get(username string) (User, error) {
 }
 
 func GetAll() ([]User, error) {
-	const query string = "SELECT username, password_hash_with_salt, role FROM users;"
+	const query string = "SELECT username,password_hash,role FROM users;"
 
 	rows, err := db.DB.Query(query)
 	if err != nil {
@@ -48,7 +41,7 @@ func GetAll() ([]User, error) {
 
 		if err := rows.Scan(
 			&u.Username,
-			&u.PasswordHashWithSalt,
+			&u.PasswordHash,
 			&u.Role,
 		); err != nil {
 			return users, err
@@ -61,12 +54,12 @@ func GetAll() ([]User, error) {
 }
 
 func Delete(username string) (User, error) {
-	const query string = "DELETE FROM users WHERE id=? RETURNING %v;"
+	const query string = "DELETE FROM users WHERE username=? RETURNING %v;"
 
 	var u User
 	err := db.DB.QueryRow(query, username).Scan(
 		&u.Username,
-		&u.PasswordHashWithSalt,
+		&u.PasswordHash,
 		&u.Role,
 	)
 
@@ -74,12 +67,12 @@ func Delete(username string) (User, error) {
 }
 
 func Insert(user User) (User, error) {
-	const query string = "INSERT INTO users (username,password_hash_with_salt,role) VALUES (?,?,?) RETURNING username,password_hash_with_salt,role;"
+	const query string = "INSERT INTO users (username,password_hash,role) VALUES (?,?,?) RETURNING username,password_hash,role;"
 
 	var u User
-	err := db.DB.QueryRow(query, user.Username, user.PasswordHashWithSalt, u.Role).Scan(
+	err := db.DB.QueryRow(query, user.Username, user.PasswordHash, user.Role).Scan(
 		&u.Username,
-		&u.PasswordHashWithSalt,
+		&u.PasswordHash,
 		&u.Role,
 	)
 

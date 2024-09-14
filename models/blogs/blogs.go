@@ -8,21 +8,21 @@ import (
 )
 
 type Blog struct {
-	Id        int           `json:"id"`
-	AuthorId  int           `json:"author_id"`
-	Title     string        `json:"title"`
-	Content   template.HTML `json:"content"`
-	CreatedAt time.Time     `json:"created_at"`
-	UpdatedAt time.Time     `json:"updated_at"`
+	Id            int           `json:"id"`
+	OwnerUsername string        `json:"owner_username"`
+	Title         string        `json:"title"`
+	Content       template.HTML `json:"content"`
+	CreatedAt     time.Time     `json:"created_at"`
+	UpdatedAt     time.Time     `json:"updated_at"`
 }
 
 func Get(id int) (Blog, error) {
-	const query string = "SELECT id,author_id,title,content,created_at,updated_at FROM blogs WHERE id=?;"
+	const query string = "SELECT id,owner_username,title,content,created_at,updated_at FROM blogs WHERE id=?;"
 
 	var b Blog
 	err := db.DB.QueryRow(query, id).Scan(
 		&b.Id,
-		&b.AuthorId,
+		&b.OwnerUsername,
 		&b.Title,
 		&b.Content,
 		&b.CreatedAt,
@@ -33,7 +33,7 @@ func Get(id int) (Blog, error) {
 }
 
 func GetAll() ([]Blog, error) {
-	const query string = "SELECT id,author_id,title,content,created_at,updated_at FROM blogs;"
+	const query string = "SELECT id,owner_username,title,content,created_at,updated_at FROM blogs;"
 
 	rows, err := db.DB.Query(query)
 	if err != nil {
@@ -50,7 +50,7 @@ func GetAll() ([]Blog, error) {
 
 		if err := rows.Scan(
 			&b.Id,
-			&b.AuthorId,
+			&b.OwnerUsername,
 			&b.Title,
 			&b.Content,
 			&b.CreatedAt,
@@ -66,12 +66,12 @@ func GetAll() ([]Blog, error) {
 }
 
 func Insert(blog Blog) (Blog, error) {
-	const query string = "INSERT INTO blogs (author_id,title,content) VALUES (?,?,?) RETURNING id,author_id,title,content,created_at,updated_at;"
+	const query string = "INSERT INTO blogs (owner_username,title,content) VALUES (?,?,?) RETURNING id,owner_username,title,content,created_at,updated_at;"
 
 	var b Blog
-	err := db.DB.QueryRow(query, blog.AuthorId, blog.Title, blog.Content).Scan(
+	err := db.DB.QueryRow(query, blog.OwnerUsername, blog.Title, blog.Content).Scan(
 		&b.Id,
-		&b.AuthorId,
+		&b.OwnerUsername,
 		&b.Title,
 		&b.Content,
 		&b.CreatedAt,
@@ -82,12 +82,12 @@ func Insert(blog Blog) (Blog, error) {
 }
 
 func Update(blog Blog) (Blog, error) {
-	const query string = "INSERT INTO blogs (author_id,title,content,updated_at) VALUES (?,?,?,?) WHERE id=? RETURNING id,author_id,title,content,created_at,updated_at;"
+	const query string = "INSERT INTO blogs (owner_username,title,content,updated_at) VALUES (?,?,?,?) WHERE id=? RETURNING id,owner_username,title,content,created_at,updated_at;"
 
 	var b Blog
-	err := db.DB.QueryRow(query, blog.AuthorId, blog.Title, blog.Content, time.Now(), blog.Id).Scan(
+	err := db.DB.QueryRow(query, blog.OwnerUsername, blog.Title, blog.Content, time.Now(), blog.Id).Scan(
 		&b.Id,
-		&b.AuthorId,
+		&b.OwnerUsername,
 		&b.Title,
 		&b.Content,
 		&b.CreatedAt,
@@ -98,12 +98,12 @@ func Update(blog Blog) (Blog, error) {
 }
 
 func Delete(id int) (Blog, error) {
-	const query string = "DELETE FROM blogs WHERE id=? RETURNING id,author_id,title,content,created_at,updated_at;"
+	const query string = "DELETE FROM blogs WHERE id=? RETURNING id,owner_username,title,content,created_at,updated_at;"
 
 	var b Blog
 	err := db.DB.QueryRow(query, id).Scan(
 		&b.Id,
-		&b.AuthorId,
+		&b.OwnerUsername,
 		&b.Title,
 		&b.Content,
 		&b.CreatedAt,

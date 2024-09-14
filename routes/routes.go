@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/LucDeCaf/go-simple-blog/auth"
 	e "github.com/LucDeCaf/go-simple-blog/errors"
-	"github.com/LucDeCaf/go-simple-blog/models/authors"
 	"github.com/LucDeCaf/go-simple-blog/models/blogs"
 	"github.com/LucDeCaf/go-simple-blog/models/users"
 	"github.com/LucDeCaf/go-simple-blog/sanitizer"
@@ -47,61 +47,6 @@ func extractUser(r *http.Request) (users.User, *e.HttpError) {
 	return user, nil
 }
 
-func AuthorsHandler(w http.ResponseWriter, r *http.Request) error {
-	switch r.Method {
-	case http.MethodGet:
-		allAuthors, err := authors.GetAll()
-		if err != nil {
-			httpRespond(w, 500, "internal server error")
-			return err
-		}
-
-		en := json.NewEncoder(w)
-		if err := en.Encode(allAuthors); err != nil {
-			httpRespond(w, 500, "internal server error")
-			return err
-		}
-
-	case http.MethodPost:
-		user, httpErr := extractUser(r)
-		if httpErr != nil {
-			httpRespond(w, httpErr.Code, httpErr.Message)
-			return httpErr
-		}
-
-		if user.Role != users.RoleAdmin {
-			httpRespond(w, 403, "unauthorized")
-			return e.NewHttpError(403, "unauthorized")
-		}
-
-		de := json.NewDecoder(r.Body)
-		de.DisallowUnknownFields()
-
-		var author authors.Author
-
-		if err := de.Decode(&author); err != nil {
-			httpRespond(w, 400, "bad request")
-			return err
-		}
-
-		author, err := authors.Insert(author)
-		if err != nil {
-			httpRespond(w, 500, "internal server error")
-			return err
-		}
-
-		w.WriteHeader(201)
-		if err := json.NewEncoder(w).Encode(author); err != nil {
-			return err
-		}
-	default:
-		httpRespond(w, 405, "method not allowed")
-		return fmt.Errorf("method '%v' not allowed", r.Method)
-	}
-
-	return nil
-}
-
 func BlogsHandler(w http.ResponseWriter, r *http.Request) error {
 	switch r.Method {
 	case http.MethodGet:
@@ -124,7 +69,7 @@ func BlogsHandler(w http.ResponseWriter, r *http.Request) error {
 			return httpErr
 		}
 
-		if user.Role != users.RoleAdmin {
+		if user.Role != "admin" {
 			httpRespond(w, 403, "unauthorized")
 			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", user.Role))
 		}
@@ -151,57 +96,6 @@ func BlogsHandler(w http.ResponseWriter, r *http.Request) error {
 		if err := json.NewEncoder(w).Encode(blog); err != nil {
 			return err
 		}
-	default:
-		httpRespond(w, 405, "method not allowed")
-		return fmt.Errorf("method '%v' not allowed", r.Method)
-	}
-
-	return nil
-}
-
-func AuthorsIdHandler(w http.ResponseWriter, r *http.Request) error {
-	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		httpRespond(w, 400, "bad request")
-		return err
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		author, err := authors.Get(id)
-		if err != nil {
-			httpRespond(w, 404, "not found")
-			return err
-		}
-
-		if err = json.NewEncoder(w).Encode(author); err != nil {
-			return err
-		}
-
-	case http.MethodDelete:
-		user, httpErr := extractUser(r)
-		if httpErr != nil {
-			httpRespond(w, httpErr.Code, httpErr.Message)
-			return httpErr
-		}
-
-		if user.Role != users.RoleAdmin {
-			httpRespond(w, 403, "unauthorized")
-			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", user.Role))
-		}
-
-		author, err := authors.Delete(id)
-		if err != nil {
-			httpRespond(w, 500, "internal server error")
-			return err
-		}
-
-		w.WriteHeader(200)
-		if err := json.NewEncoder(w).Encode(author); err != nil {
-			return err
-		}
-
 	default:
 		httpRespond(w, 405, "method not allowed")
 		return fmt.Errorf("method '%v' not allowed", r.Method)
@@ -237,7 +131,7 @@ func BlogsIdHandler(w http.ResponseWriter, r *http.Request) error {
 			return httpErr
 		}
 
-		if user.Role != users.RoleAdmin {
+		if user.Role != "admin" {
 			httpRespond(w, 403, "unauthorized")
 			return e.NewHttpError(403, fmt.Sprintf("unauthorized role '%v'", user.Role))
 		}
@@ -259,6 +153,51 @@ func BlogsIdHandler(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	return nil
+}
+
+func UsersHandler(w http.ResponseWriter, r *http.Request) error {
+	if r.Method != http.MethodPost {
+		httpRespond(w, 405, "method not allowed")
+		return fmt.Errorf("method not allowed: %v", r.Method)
+	}
+
+	switch r.Header.Get("Server-Action") {
+	case "GetByUsername":
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			httpRespond(w, 500, "internal server error")
+			return err
+		}
+
+		username := string(body)
+
+		user, err := users.Get(username)
+
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				httpRespond(w, 404, "not found")
+			} else {
+				httpRespond(w, 500, "internal server error")
+			}
+
+			return err
+		}
+
+		response, err := json.Marshal(user)
+		if err != nil {
+			httpRespond(w, 500, "internal server error")
+			return err
+		}
+
+		w.Write(response)
+
+		return nil
+	default:
+		msg := "missing Server-Action header"
+
+		httpRespond(w, 400, msg)
+		return fmt.Errorf(msg)
+	}
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) error {
@@ -292,7 +231,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if !auth.VerifyPassword(lr.Password, user.PasswordHashWithSalt) {
+	if !auth.VerifyPassword(lr.Password, user.PasswordHash) {
 		httpRespond(w, 400, "incorrect username or password")
 		return fmt.Errorf("incorrect password")
 	}
@@ -362,9 +301,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	user, err := users.Insert(users.User{
-		Username:             lr.Username,
-		PasswordHashWithSalt: pwHash,
-		Role:                 users.RoleUser,
+		Username:     lr.Username,
+		PasswordHash: pwHash,
+		Role:         "user",
 	})
 	if err != nil {
 		httpRespond(w, 500, "internal server error")

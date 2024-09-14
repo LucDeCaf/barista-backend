@@ -24,22 +24,17 @@ func main() {
 
 	v1 := http.NewServeMux()
 
-	v1.Handle("/authors", middlewares(routes.AuthorsHandler))
-	v1.Handle("/authors/{id}", middlewares(routes.AuthorsIdHandler))
-	v1.Handle("/blogs", middlewares(routes.BlogsHandler))
-	v1.Handle("/blogs/{id}", middlewares(routes.BlogsIdHandler))
+	v1.Handle("/blogs", mw.Logging(routes.BlogsHandler).Build())
+	v1.Handle("/blogs/{id}", mw.Logging(routes.BlogsIdHandler).Build())
+	v1.Handle("/users", mw.Logging(routes.UsersHandler).Build())
 
 	http.Handle("/v1/", http.StripPrefix("/v1", v1))
 
-	http.Handle("/login", middlewares(routes.LoginHandler))
-	http.Handle("/register", middlewares(routes.RegisterHandler))
+	http.Handle("/login", mw.Logging(routes.LoginHandler).Build())
+	http.Handle("/register", mw.Logging(routes.RegisterHandler).Build())
 
 	log.Println("api listening on port " + port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Print(err)
 	}
-}
-
-func middlewares(h mw.Handler) http.Handler {
-	return mw.Build(mw.RequestLogger(mw.ErrorLogger(h)))
 }

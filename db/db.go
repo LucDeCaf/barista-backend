@@ -11,7 +11,7 @@ var DB *sql.DB
 
 func init() {
 	var err error
-	DB, err = sql.Open("sqlite3", "db.db")
+	DB, err = sql.Open("sqlite3", "file:db.db?_foreign_keys=on")
 	if err != nil {
 		log.Fatal(err)
 	}
