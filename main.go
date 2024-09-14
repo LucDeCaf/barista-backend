@@ -9,6 +9,7 @@ import (
 
 	mw "github.com/LucDeCaf/go-simple-blog/middleware"
 	"github.com/LucDeCaf/go-simple-blog/routes"
+	"github.com/LucDeCaf/go-simple-blog/routes/v1"
 )
 
 func main() {
@@ -22,13 +23,13 @@ func main() {
 
 	port := *portPtr
 
-	v1 := http.NewServeMux()
+	v1Router := http.NewServeMux()
 
-	v1.Handle("/blogs", mw.Logging(routes.BlogsHandler).Build())
-	v1.Handle("/blogs/{id}", mw.Logging(routes.BlogsIdHandler).Build())
-	v1.Handle("/users", mw.Logging(routes.UsersHandler).Build())
+	v1Router.Handle("/blogs", mw.Logging(v1.BlogsHandler).Build())
+	v1Router.Handle("/blogs/{id}", mw.Logging(v1.BlogsIdHandler).Build())
+	v1Router.Handle("/users", mw.Logging(v1.UsersHandler).Build())
 
-	http.Handle("/v1/", http.StripPrefix("/v1", v1))
+	http.Handle("/v1/", http.StripPrefix("/v1", v1Router))
 
 	http.Handle("/login", mw.Logging(routes.LoginHandler).Build())
 	http.Handle("/register", mw.Logging(routes.RegisterHandler).Build())
