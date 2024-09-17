@@ -43,19 +43,39 @@ func UsersHandler(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
-		response, err := json.Marshal(user)
+		resp, err := json.Marshal(user)
 		if err != nil {
 			w.WriteHeader(500)
 			w.Write([]byte("internal server error"))
 			return err
 		}
 
-		w.Write(response)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(resp)
 
-		return nil
+	case "GetAll":
+		users, err := users.GetAll()
+		if err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte("internal server error"))
+			return err
+		}
+
+		resp, err := json.Marshal(users)
+		if err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte("internal server error"))
+			return err
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(resp)
+
 	default:
 		w.WriteHeader(400)
 		w.Write([]byte("missing Server-Action header"))
 		return fmt.Errorf("missing Server-Action header")
 	}
+
+	return nil
 }
