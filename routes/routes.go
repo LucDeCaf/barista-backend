@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/LucDeCaf/go-simple-blog/auth"
@@ -10,11 +9,6 @@ import (
 )
 
 var V1 *http.ServeMux
-
-func HttpRespond(w http.ResponseWriter, code int, message string) {
-	w.WriteHeader(code)
-	w.Write([]byte(fmt.Sprintf("%v %v\n", code, message)))
-}
 
 func ExtractUser(r *http.Request) (users.User, *e.HttpError) {
 	token, err := auth.ExtractJWT(r)

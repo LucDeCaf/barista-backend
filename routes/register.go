@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -17,16 +17,17 @@ type registerRequest struct {
 	Password string `json:"password"`
 }
 
-func RegisterHandler(w http.ResponseWriter, r *http.Request) error {
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		HttpRespond(w, 405, "method not allowed")
-		return fmt.Errorf("method '%v' not allowed", r.Method)
+		http.Error(w, "method not allowed", 405)
+		return
 	}
 
 	var rr registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&rr); err != nil {
-		HttpRespond(w, 400, "bad request")
-		return err
+		log.Println("err decoding request:", err.Error())
+		http.Error(w, "bad request", 400)
+		return
 	}
 
 	// Remove leading or trailing whitespace
@@ -35,22 +36,24 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) error {
 
 	// Prevent empty username / password
 	if rr.Username == "" || rr.Password == "" {
-		HttpRespond(w, 400, "missing username or password")
-		return fmt.Errorf("missing username or password ('%v', '%v')", rr.Username, rr.Password)
+		log.Println("missing username or password")
+		http.Error(w, "missing username or password", 400)
+		return
 	}
 
 	// Password requirements
 	if len(rr.Password) < 8 {
-		HttpRespond(w, 400, "password must be at least 8 characters")
-		return fmt.Errorf("password too short")
+		log.Println("password too short")
+		http.Error(w, "password must be at least 8 characters", 400)
+		return
 	}
 
 	_, err := users.Get(rr.Username)
 
 	// Successful return means username already in use
 	if err == nil {
-		HttpRespond(w, 400, "username already exists")
-		return fmt.Errorf("username already exists")
+		http.Error(w, "username already exists", 400)
+		return
 	}
 
 	/*
@@ -60,14 +63,16 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) error {
 		If any other error occurs, then it is an actual server error.
 	*/
 	if !errors.Is(err, sql.ErrNoRows) {
-		HttpRespond(w, 500, "internal server error")
-		return err
+		log.Println("err checking for user:", err.Error())
+		http.Error(w, "internal server error", 500)
+		return
 	}
 
 	pwHash, err := auth.HashPassword(rr.Password)
 	if err != nil {
-		HttpRespond(w, 500, "internal server error")
-		return err
+		log.Println("err hashing password:", err.Error())
+		http.Error(w, "internal server error", 500)
+		return
 	}
 
 	user, err := users.Insert(users.User{
@@ -76,14 +81,16 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) error {
 		Role:         "user",
 	})
 	if err != nil {
-		HttpRespond(w, 500, "internal server error")
-		return err
+		log.Println("err creating user:", err.Error())
+		http.Error(w, "internal server error", 500)
+		return
 	}
 
 	w.WriteHeader(201)
 	if err := json.NewEncoder(w).Encode(user); err != nil {
-		return err
+		log.Println("err encoding user to json:", err.Error())
+		return
 	}
 
-	return nil
+	return
 }

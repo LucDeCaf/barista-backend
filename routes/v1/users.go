@@ -4,27 +4,26 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/LucDeCaf/go-simple-blog/models/users"
 )
 
-func UsersHandler(w http.ResponseWriter, r *http.Request) error {
+func UsersHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(405)
-		w.Write([]byte("method not allowed"))
-		return fmt.Errorf("method not allowed: %v", r.Method)
+		http.Error(w, "method not allowed", 405)
+		return
 	}
 
 	switch r.Header.Get("Server-Action") {
 	case "GetByUsername":
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte("internal server error"))
-			return err
+			log.Println("err reading body:", err.Error())
+			http.Error(w, "internal server error", 500)
+			return
 		}
 
 		username := string(body)
@@ -33,21 +32,20 @@ func UsersHandler(w http.ResponseWriter, r *http.Request) error {
 
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				w.WriteHeader(404)
-				w.Write([]byte("not found"))
+				http.Error(w, "not found", 404)
 			} else {
-				w.WriteHeader(500)
-				w.Write([]byte("internal server error"))
+				http.Error(w, "internal server error", 500)
 			}
 
-			return err
+			log.Println("err getting user:", err.Error())
+			return
 		}
 
 		resp, err := json.Marshal(user)
 		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte("internal server error"))
-			return err
+			log.Println("err converting user to json:", err.Error())
+			http.Error(w, "internal server error", 500)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -56,26 +54,25 @@ func UsersHandler(w http.ResponseWriter, r *http.Request) error {
 	case "GetAll":
 		users, err := users.GetAll()
 		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte("internal server error"))
-			return err
+			log.Println("err getting all users:", err.Error())
+			http.Error(w, "internal server error", 500)
+			return
 		}
 
 		resp, err := json.Marshal(users)
 		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte("internal server error"))
-			return err
+			log.Println("err converting user to json:", err.Error())
+			http.Error(w, "internal server error", 500)
+			return
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(resp)
 
 	default:
-		w.WriteHeader(400)
-		w.Write([]byte("missing Server-Action header"))
-		return fmt.Errorf("missing Server-Action header")
+		http.Error(w, "missing Server-Action header", 400)
+		return
 	}
 
-	return nil
+	return
 }

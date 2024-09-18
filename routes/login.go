@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -17,49 +17,53 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) error {
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		HttpRespond(w, 405, "method not allowed")
-		return fmt.Errorf("invalid method %v", r.Method)
+		http.Error(w, "method not allowed", 405)
+		return
 	}
 
 	var lr loginRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&lr); err != nil {
-		HttpRespond(w, 400, "bad request")
-		return err
+		log.Println("err decoding body:", err.Error())
+		http.Error(w, "bad request", 400)
+		return
 	}
 
 	lr.Username = strings.TrimSpace(lr.Username)
 	lr.Password = strings.TrimSpace(lr.Password)
 
 	if lr.Username == "" || lr.Password == "" {
-		HttpRespond(w, 400, "incorrect username or password")
-		return fmt.Errorf("missing username or password ('%v', '%v')", lr.Username, lr.Password)
+		http.Error(w, "incorrect username or password", 400)
+		return
 	}
 
 	user, err := users.Get(lr.Username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			HttpRespond(w, 400, "incorrect username or password")
+			http.Error(w, "incorrect username or password", 400)
 		} else {
-			HttpRespond(w, 500, "internal server error")
+			log.Println("err getting user:", err.Error())
+			http.Error(w, "internal server error", 500)
 		}
-		return err
+
+		return
 	}
 
 	if !auth.VerifyPassword(lr.Password, user.PasswordHash) {
-		HttpRespond(w, 400, "incorrect username or password")
-		return fmt.Errorf("incorrect password")
+		http.Error(w, "incorrect username or password", 400)
+		return
 	}
 
 	token, err := auth.NewJWT(lr.Username)
 	if err != nil {
-		HttpRespond(w, 500, "internal server error")
-		return err
+		log.Println("err creating JWT:", err.Error())
+		http.Error(w, "internal server error", 500)
+		return
 	}
 
 	w.Write([]byte(token))
 
-	return nil
+	return
 }
